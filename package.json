@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-bellabot",
   "description": "",
-  "version": "0.0.0",
+  "version": "0.0.3",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -30,7 +30,6 @@
     }
   },
   "license": "MIT",
-  "scripts": {},
   "keywords": [
     "chatbot",
     "koishi",
@@ -43,6 +42,7 @@
     "bilibili"
   ],
   "peerDependencies": {
-    "koishi": "^4.16.5"
+    "@satorijs/element": "^1.1.3",
+    "koishi": "^4.17.12"
   }
 }
