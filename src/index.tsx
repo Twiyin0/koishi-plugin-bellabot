@@ -1,7 +1,9 @@
-import { Context, Schema, h, Random, Logger } from 'koishi'
+import { Context, Schema, h, Random, Logger, Session } from 'koishi'
 import { pathToFileURL } from 'url'
 import { resolve } from 'path'
 import {} from "koishi-plugin-puppeteer";
+import type {} from "koishi-plugin-monetary"
+import {} from 'koishi-plugin-rate-limit'
 import { Page } from "puppeteer-core";
 import { Signin } from './signin';
 import { jryspro } from './jryspro';
@@ -15,12 +17,17 @@ export const name = 'bellabot'
 const logger = new Logger(name);
 
 export const usage = `
+## 积分迁移至通用货币
+1. 将本插件更新至0.1.0及以上版本
+2. 安装 monetary 插件并启用,使用权限等级大于等于3的管理员对着bot使用命令" bella-tranferData "即可完成迁移  
+3. 迁移命令仅需运行一次即可，本插件币种为"Bella"
+
 ## 更新插件前请停止运行插件
 插件配置项可能会有改动，不停止插件直接更新可能会导致koishi炸掉  
 
 ## 使用说明
 插件内置4张涩图，可以开箱即用  
-backgroundImage支持本地文件夹绝对路径和http(s) url直接返回图片的api  
+imgurl支持本地文件夹绝对路径和http(s) url直接返回图片的api  
 随机文件夹内图片时请注意路径\`C:/user/path/to/\`不要把后面的/忘了   
 
 ## api说明
@@ -77,7 +84,10 @@ export const Config: Schema<Config> = Schema.object({
   }).description("bilibili视频解析配置")
 })
 
-export const inject = ['puppeteer', 'database']
+export const inject = {
+  required: ['database','puppeteer'],
+  optional: ['monetary']
+}
 
 export function apply(ctx: Context, config: Config) {
   // 分支插件扩展
@@ -85,6 +95,19 @@ export function apply(ctx: Context, config: Config) {
   if (config.common.interaction) ctx.plugin(interaction, {'bellabot-interaction': true})
   // 构建signin类
   const signin = new Signin(ctx, config);
+
+  ctx.command("bella-tranferData", "通用货币同步(只要执行一次就行)", {authority: 3, maxUsage: 1})
+  .userFields(['name', 'id'])
+  .action(async ({session}) => {
+    if (ctx.monetary) {
+      const data = await ctx.database.get('monetary', {
+        value: { $gt: 0 }
+      })
+      if (data.length === 0)
+        return await transferData(ctx, session);
+      else return <>您已迁移过monetary</>
+    } else return <>你没有启用monetary服务</>
+  })
   // 主命令
   ctx.command("bella", "贝拉菜单").alias("贝拉菜单")
   .action(async ({session}) => {
@@ -252,4 +275,30 @@ async function readFilenames(dirPath:string) {
     }
   });
   return filenames;
+}
+
+async function transferData(ctx:Context, session:Session) {
+  try {
+    let orgData = await ctx.database.get('bella_sign_in', {
+      point: { $gt: 0 },
+    })
+    for (const data of orgData) {
+      let bindingInfo = await ctx.database.get('binding', { pid: String(data.id), platform: session.bot.platform });
+    
+      if (bindingInfo.length === 0) {
+        continue;
+      }
+    
+      let uid = bindingInfo[0];
+      let point = data.point;
+
+      if (uid?.aid) {
+        await ctx.monetary.gain(uid.aid, point, "Bella");
+      }
+    }
+    return "[贝拉签到]>> 迁移数据成功！"
+  } catch (err) {
+    logger.error(`[bella-sign-in Error]:\r\n`+err);
+    return "[贝拉签到]>> 迁移数据时发生错误，请查看log！"
+  }
 }
