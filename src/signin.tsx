@@ -85,8 +85,8 @@ export class Signin {
   // 参数：session， 返回：json
   async callSignin(session) {
     var name:any;
-    if (this.ctx.database && this.cfg.callme) name = session.username;
-    if (!name && this.cfg.callme) name = session.author.name;
+    if (this.ctx.database && this.cfg.signin.callme) name = session.username;
+    if (!name && this.cfg.signin.callme) name = session.author.name;
     else name = session.username;
     name = name.length>12? name.substring(0,12):name;
 
@@ -95,7 +95,7 @@ export class Signin {
     let time = (await this.ctx.database.get('bella_sign_in', { id: String(session.userId) }))[0]?.time;
     let count = (await this.ctx.database.get('bella_sign_in', { id: String(session.userId) }))[0]?.count;
     let dbname = (await this.ctx.database.get('bella_sign_in', { id: String(session.userId) }))[0]?.name;
-    let signpoint = Random.int(this.cfg.signpointmin,this.cfg.signpointmax);
+    let signpoint:number = Random.int(this.cfg.signin.signpointmin,this.cfg.signin.signpointmax);
     let nowPoint = (await this.ctx.database.get('bella_sign_in', { id: String(session.userId) }))[0]?.current_point;
     if (!dbname) await this.ctx.database.upsert('bella_sign_in', [{ id: (String(session.userId)), name: name }]);
     if (!all_point && !time) {
@@ -105,6 +105,7 @@ export class Signin {
         return { "cmd":"get", "status": 1, "getpoint": signpoint, "signTime": signTime, "allpoint": signpoint, "count": 1 };
     }
     if (Number(time.slice(8,10)) - Number(signTime.slice(8,10))) {
+      this.ctx.logger(`userID: ${session.user.id}`);
         if (this.ctx.monetary) await this.ctx.monetary.gain(session.user.id, signpoint, "Bella");
         await this.ctx.database.upsert('bella_sign_in', [{ id: (String(session.userId)), name: name, time: signTime, point: Number(all_point+signpoint), count: count+1, current_point: Number(signpoint) }]);
         // logger.info(`${name}(${session.userId}) 签到成功！`)
@@ -132,7 +133,7 @@ export class Signin {
     if (!point || point < 0 || isNaN(Number(point))) return "请输入有效积分";
     else if (all_point-point < 0) return "积分不足!";
     else {
-    if(Random.bool(this.cfg.lotteryOdds)) {
+    if(Random.bool(this.cfg.signin.lotteryOdds)) {
         if (this.ctx.monetary) await this.ctx.monetary.cost(session.user.id, point, "Bella");
         var result:any = this.rangePoint(point);
         if (this.ctx.monetary) await this.ctx.monetary.gain(session.user.id, result.final_point, "Bella");
@@ -167,8 +168,8 @@ export class Signin {
   // 参数：session 返回：<>string</>
   async workstart(session) {
     var name:any;
-    if (this.ctx.database && this.cfg.callme) name = session.user.name;
-    if (!name && this.cfg.callme) name = session.author.name;
+    if (this.ctx.database && this.cfg.signin.callme) name = session.user.name;
+    if (!name && this.cfg.signin.callme) name = session.author.name;
     else name = session.username;
     let working = (await this.ctx.database.get('bella_sign_in', { id: String(session.userId) }))[0]?.working;
     let wktimecard = (await this.ctx.database.get('bella_sign_in', { id: String(session.userId) }))[0]?.wktimecard;
@@ -183,8 +184,8 @@ export class Signin {
   // 参数：session 返回：<>string</>
   async workend(session) {
     var name:any;
-    if (this.ctx.database && this.cfg.callme) name = session.user.name;
-    if (!name && this.cfg.callme) name = session.author.name;
+    if (this.ctx.database && this.cfg.signin.callme) name = session.user.name;
+    if (!name && this.cfg.signin.callme) name = session.author.name;
     else name = session.username;
     let all_point = (await this.ctx.database.get('bella_sign_in', { id: String(session.userId) }))[0]?.point;
     let working = (await this.ctx.database.get('bella_sign_in', { id: String(session.userId) }))[0]?.working;
@@ -210,8 +211,8 @@ export class Signin {
   // 参数：session 返回：<>string</>
   async workcheck(session) {
     var name:any;
-    if (this.ctx.database && this.cfg.callme) name = session.user.name;
-    if (!name && this.cfg.callme) name = session.author.name;
+    if (this.ctx.database && this.cfg.signin.callme) name = session.user.name;
+    if (!name && this.cfg.signin.callme) name = session.author.name;
     else name = session.username;
     let all_point = (await this.ctx.database.get('bella_sign_in', { id: String(session.userId) }))[0]?.point;
     let working = (await this.ctx.database.get('bella_sign_in', { id: String(session.userId) }))[0]?.working;
@@ -236,7 +237,7 @@ export class Signin {
     if (!user) user = session.userId;
     if (!count) return <>请输入有效数字</>
     if (count<0 && all_point-Math.abs(count)<=0) return <>对方没有这么多积分</>
-    else if (this.cfg.superuser.includes(session.userId)) {
+    else if (this.cfg.signin.superuser.includes(session.userId)) {
       if (this.ctx.monetary) await this.ctx.monetary.gain(session.user.id, count, "Bella");
       await this.ctx.database.upsert('bella_sign_in', [{ id: (String(user.replace(/.*:/gi,''))), point: (count<0)? all_point-Math.abs(count):all_point+count}]);
       return <>成功给<at id={user.replace(/.*:/gi,'')? user:user.replace(/.*:/gi,'')}/>{(count<0)? "减去":"补充"}{count}点积分.</>

@@ -47,6 +47,7 @@ export interface Config {
     signpointmax: number,
     signpointmin: number,
     lotteryOdds: number,
+    imgQuality: number,
     callme: boolean,
     waittip: boolean,
   },
@@ -73,6 +74,8 @@ export const Config: Schema<Config> = Schema.object({
     .description('签到积分随机最小值'),
     lotteryOdds: Schema.percent().default(0.6)
     .description('抽奖指令中倍率的概率(默认0.6)'),
+    imgQuality: Schema.percent().default(0.4)
+    .description("输出渲染图质量"),
     callme: Schema.boolean().default(false)
     .description("启用callme(需要安装callme插件)"),
     waittip: Schema.boolean().default(false)
@@ -130,7 +133,7 @@ export function apply(ctx: Context, config: Config) {
   // 签到命令
   ctx.command("bella/signin", "贝拉签到").alias("签到")
   .option('text','-t 纯文本输出')
-  .userFields(['name'])
+  .userFields(['name', 'id'])
   .action(async ({session, options}) => {
     const jrys = new jryspro();
     const date = new Date();
@@ -150,7 +153,9 @@ export function apply(ctx: Context, config: Config) {
     else bgUrl = pathToFileURL(resolve(__dirname, (config.common.backgroundImage + Random.pick(await getFolderImg(config.common.backgroundImage))))).href;
 
     // 数据结构 { "cmd":"get", "status": 1, "getpoint": signpoint, "signTime": signTime, "allpoint": signpoint, "count": 1 };
+    // let rdmN = Random.int(config.signin.signpointmin, config.signin.signpointmax)
     const getSigninJson = await signin.callSignin(session);
+    // session.send(<>{getSigninJson.getpoint} , {rdmN}</>)
     let lvline = signin.levelJudge(Number(getSigninJson.allpoint)).level_line;
 
     if (options.text) return <><at id={session.userId} />{getSigninJson.status? "签到成功！" : "今天已经签到过啦！"},本次签到获得积分:{getSigninJson.getpoint}</>
@@ -176,9 +181,13 @@ export function apply(ctx: Context, config: Config) {
       await page.goto(`file:///${resolve(__dirname, "./index/index.html")}`);
       await page.waitForSelector("#body");
       const element = await page.$("#body");
-      return h.image(await element.screenshot({
-              encoding: "binary"
-            }), "image/png")
+      return h.image(await element.screenshot(config.signin.imgQuality===1? {
+        encoding: "binary",
+      }:{
+        type: "jpeg",
+        encoding: "binary",
+        quality: (config.signin.imgQuality*100)%101
+      }), "image/png")
     } catch (err) {
       logger.error(err);
       return <>哪里出的问题！md跟你爆了！</>
